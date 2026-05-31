@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 152 36" width="152" height="36" fill="none">
+  <defs>
+    <clipPath id="lgc"><circle cx="18" cy="18" r="16"/></clipPath>
+  </defs>
+  <!-- Globe (green on transparent) -->
+  <circle cx="18" cy="18" r="16" stroke="#1A6B3A" stroke-width="1.8"/>
+  <g clip-path="url(#lgc)" stroke="#1A6B3A" fill="none">
+    <path d="M 3 13 Q 18 9 33 13" stroke-width="1.2"/>
+    <line x1="2" y1="18" x2="34" y2="18" stroke-width="1.2"/>
+    <path d="M 3 23 Q 18 27 33 23" stroke-width="1.2"/>
+  </g>
+  <!-- Fork -->
+  <line x1="13" y1="29" x2="13" y2="20" stroke="#1A6B3A" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="10" y1="20" x2="16" y2="20" stroke="#1A6B3A" stroke-width="1.6" stroke-linecap="round"/>
+  <line x1="10" y1="20" x2="10" y2="10" stroke="#1A6B3A" stroke-width="1.4" stroke-linecap="round"/>
+  <line x1="13" y1="19" x2="13" y2="9"  stroke="#1A6B3A" stroke-width="1.4" stroke-linecap="round"/>
+  <line x1="16" y1="20" x2="16" y2="10" stroke="#1A6B3A" stroke-width="1.4" stroke-linecap="round"/>
+  <!-- Spoon -->
+  <ellipse cx="23" cy="11" rx="3" ry="4" stroke="#1A6B3A" stroke-width="1.6"/>
+  <line x1="23" y1="15" x2="23" y2="29" stroke="#1A6B3A" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- Text -->
+  <text x="40" y="25" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" fill="#1A6B3A" font-size="18" letter-spacing="-0.01em">
+    <tspan font-weight="500">Meal</tspan><tspan font-weight="700">4</tspan><tspan font-weight="500">Mood</tspan>
+  </text>
+</svg>
