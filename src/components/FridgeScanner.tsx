@@ -11,27 +11,34 @@ export default function FridgeScanner({ onIngredients }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [scanState, setScanState] = useState<ScanState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [found, setFound] = useState(0);
+
+  const fail = (msg: string) => {
+    setErrorMsg(msg);
+    setScanState("error");
+    setTimeout(() => setScanState("idle"), 3000);
+  };
 
   const handleFile = async (file: File) => {
     setScanState("scanning");
     setErrorMsg("");
     try {
-      const base64 = await fileToBase64(file);
-      const mediaType = file.type || "image/jpeg";
+      const { data, mediaType } = await prepareImage(file);
       const res = await fetch("/api/scan-fridge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64, mediaType }),
+        body: JSON.stringify({ image: data, mediaType }),
       });
-      if (!res.ok) throw new Error("Scan failed");
-      const { ingredients } = await res.json();
-      onIngredients(ingredients as string[]);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return fail(body.error ?? "Couldn't scan the photo. Try again.");
+      const ingredients = (body.ingredients ?? []) as string[];
+      if (!body.isFoodPhoto || ingredients.length === 0) return fail("No food spotted — try another photo.");
+      onIngredients(ingredients);
+      setFound(ingredients.length);
       setScanState("done");
-      setTimeout(() => setScanState("idle"), 2000);
+      setTimeout(() => setScanState("idle"), 2500);
     } catch {
-      setErrorMsg("Couldn't scan the photo. Try again.");
-      setScanState("error");
-      setTimeout(() => setScanState("idle"), 3000);
+      fail("Couldn't scan the photo. Try again.");
     }
   };
 
@@ -43,7 +50,7 @@ export default function FridgeScanner({ onIngredients }: Props) {
 
   const label =
     scanState === "scanning" ? "Scanning your fridge…" :
-    scanState === "done"     ? "Ingredients added!" :
+    scanState === "done"     ? `Added ${found} ingredient${found === 1 ? "" : "s"}!` :
     scanState === "error"    ? errorMsg :
     "Scan my fridge";
 
@@ -84,6 +91,28 @@ export default function FridgeScanner({ onIngredients }: Props) {
       </button>
     </>
   );
+}
+
+// Phone photos are often 4000px+ and several MB. The model only needs ~1024px
+// to read a fridge, so shrink and re-encode before upload: faster scans, far
+// less data sent, and about half the image tokens of a full-size upload.
+const MAX_SIDE = 1024;
+
+async function prepareImage(file: File): Promise<{ data: string; mediaType: string }> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+    return { data: dataUrl.split(",")[1], mediaType: "image/jpeg" };
+  } catch {
+    // Browser couldn't decode it (e.g. HEIC) — send the original.
+    return { data: await fileToBase64(file), mediaType: file.type || "image/jpeg" };
+  }
 }
 
 function fileToBase64(file: File): Promise<string> {

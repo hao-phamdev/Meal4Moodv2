@@ -2,19 +2,11 @@
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { useTheme } from "@/hooks/useTheme";
-import { useAuth } from "@/hooks/useAuth";
 
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const [dark, setDark] = useTheme();
-  const { user, signOut } = useAuth();
-
-  const handleSignOut = async () => {
-    await signOut();
-    router.push("/login");
-    router.refresh();
-  };
 
   return (
     <nav style={{
@@ -62,47 +54,6 @@ export default function Navbar() {
             </svg>
           )}
         </button>
-
-        {user ? (
-          <button
-            data-kind="ghost"
-            onClick={handleSignOut}
-            style={{
-              background: "transparent", color: "var(--m4m-brand)",
-              border: "0.5px solid var(--m4m-border)",
-              height: 36, padding: "0 16px", borderRadius: 8,
-              fontSize: 13, fontWeight: 500, cursor: "pointer",
-              transition: "background 200ms ease-in-out",
-            }}>
-            Sign out
-          </button>
-        ) : (
-          <>
-            <button
-              data-kind="ghost"
-              onClick={() => router.push("/login")}
-              style={{
-                background: "transparent", color: "var(--m4m-brand)",
-                border: "0.5px solid var(--m4m-border)",
-                height: 36, padding: "0 16px", borderRadius: 8,
-                fontSize: 13, fontWeight: 500, cursor: "pointer",
-                transition: "background 200ms ease-in-out",
-              }}>
-              Log in
-            </button>
-            <button
-              data-kind="primary"
-              onClick={() => router.push("/signup")}
-              style={{
-                background: "var(--m4m-brand)", color: "#fff", border: "none",
-                height: 36, padding: "0 16px", borderRadius: 8,
-                fontSize: 13, fontWeight: 500, cursor: "pointer",
-                transition: "background 200ms ease-in-out",
-              }}>
-              Sign up
-            </button>
-          </>
-        )}
       </div>
     </nav>
   );

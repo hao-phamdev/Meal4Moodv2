@@ -1,79 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
-import { buildRecipePrompt } from "@/lib/prompts/recipePrompt";
-
-const client = new Anthropic();
-
-async function fetchFoodImage(dishQuery: string, cuisineQuery: string): Promise<string> {
-  const key = process.env.PEXELS_API_KEY;
-  if (!key) return `https://placehold.co/800x450?text=${encodeURIComponent(dishQuery)}`;
-
-  const queries = [
-    `${dishQuery} food`,
-    `${cuisineQuery} food dish`,
-    "plated food dish",
-  ];
-
-  for (const q of queries) {
-    try {
-      const res = await fetch(
-        `https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=1&orientation=landscape`,
-        { headers: { Authorization: key } }
-      );
-      if (!res.ok) continue;
-      const data = await res.json();
-      const url = data.photos?.[0]?.src?.large2x ?? data.photos?.[0]?.src?.large;
-      if (url) return url;
-    } catch {
-      // try next query
-    }
-  }
-
-  return `https://placehold.co/800x450?text=${encodeURIComponent(dishQuery)}`;
-}
-
-function parseRecipeJson(text: string) {
-  const clean = text.replace(/```(?:json)?/g, "").replace(/```/g, "").trim();
-  return JSON.parse(clean);
-}
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { anthropic, MODEL, EFFORT, AiError, assertUsable, buildMeta, errorResponse } from "@/lib/ai";
+import { RECIPE_SYSTEM_PROMPT, RECIPE_PATTERNS, RecipeSchema, buildRecipeUserMessage } from "@/lib/prompts/recipePrompt";
+import { parseRecipeRequest, ValidationError } from "@/lib/validate";
+import { rateLimited } from "@/lib/rateLimit";
+import { fetchFoodImage } from "@/lib/pexels";
 
 export async function POST(req: NextRequest) {
+  if (rateLimited(req, "recipe", 20, 10 * 60_000)) {
+    return NextResponse.json({ error: "Too many recipes in a short time — take a breather and try again in a few minutes." }, { status: 429 });
+  }
+
   try {
-    const body = await req.json();
-    const { mood, country, cuisine, dishes, diet, cookTime, ingredients, lastTitle, pinnedDish, flag } = body;
+    const r = parseRecipeRequest(await req.json());
+    const userMessage = buildRecipeUserMessage(r);
+    const startedAt = Date.now();
 
-    const prompt = buildRecipePrompt({ mood, country, cuisine, dishes, diet, cookTime, ingredients, lastTitle, pinnedDish });
+    const message = await anthropic.messages.parse({
+      model: MODEL,
+      max_tokens: 4000,
+      system: [{ type: "text", text: RECIPE_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: userMessage }],
+      output_config: { effort: EFFORT, format: zodOutputFormat(RecipeSchema) },
+    });
 
-    let parsed: Record<string, unknown> | null = null;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const msg = await client.messages.create({
-        model: "claude-haiku-4-5",
-        max_tokens: 1024,
-        messages: [{ role: "user", content: prompt }],
-      });
-      const text = (msg.content[0] as { type: string; text: string }).text;
-      try {
-        parsed = parseRecipeJson(text);
-        break;
-      } catch {
-        if (attempt === 1) throw new Error("Failed to parse recipe JSON after retry");
-      }
-    }
+    assertUsable(message);
+    const recipe = message.parsed_output;
+    if (!recipe) throw new AiError("The chef's recipe came back garbled. Please try again.", 502);
 
-    const title = (parsed!.title as string) || "Untitled Recipe";
-    const imageUrl = await fetchFoodImage(title, cuisine);
+    const meta = buildMeta(message, startedAt, {
+      patterns: RECIPE_PATTERNS,
+      prompt: { system: RECIPE_SYSTEM_PROMPT, messages: [{ role: "user", content: userMessage }] },
+    });
+    const imageUrl = await fetchFoodImage(recipe.title, r.cuisine);
 
     return NextResponse.json({
-      ...parsed,
+      ...recipe,
       imageUrl,
-      flag: flag ?? "🌍",
-      country,
-      cuisine,
-      mood,
-      diet,
+      flag: r.flag,
+      country: r.country,
+      cuisine: r.cuisine,
+      mood: r.mood,
+      diet: r.diet,
+      version: 1,
+      meta,
     });
   } catch (err) {
+    if (err instanceof ValidationError) return NextResponse.json({ error: err.message }, { status: 400 });
     console.error("generate-recipe error:", err);
-    return NextResponse.json({ error: "Failed to generate recipe" }, { status: 500 });
+    const { error, status } = errorResponse(err, "Failed to generate recipe");
+    return NextResponse.json({ error }, { status });
   }
 }

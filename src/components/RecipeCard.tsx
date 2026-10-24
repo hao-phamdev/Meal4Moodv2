@@ -13,9 +13,11 @@ interface Props {
 export default function RecipeCard({ recipe, onSave, saved, userIngredients = [] }: Props) {
   const [expanded, setExpanded] = useState(true);
 
+  // Prefer the items the AI says it used; fall back to fuzzy-matching the fridge list.
+  const haveItems = recipe.usedFridgeItems?.length ? recipe.usedFridgeItems : userIngredients;
   const initialChecked = recipe.ingredients.reduce<Record<number, boolean>>((acc, ing, i) => {
     const ingLower = ing.toLowerCase();
-    const hasIt = userIngredients.some(u => ingLower.includes(u.toLowerCase()) || u.toLowerCase().includes(ingLower.split(" ")[0]));
+    const hasIt = haveItems.some(u => ingLower.includes(u.toLowerCase()) || u.toLowerCase().includes(ingLower.split(" ")[0]));
     if (hasIt) acc[i] = true;
     return acc;
   }, {});
@@ -32,6 +34,22 @@ export default function RecipeCard({ recipe, onSave, saved, userIngredients = []
         border: "0.5px solid var(--m4m-light)",
         borderRadius: 12, padding: 16, marginTop: 24,
       }}>
+
+      {/* What changed in this remix */}
+      {recipe.changes && (
+        <div style={{
+          display: "flex", gap: 10, alignItems: "flex-start",
+          background: "var(--card-bg)", border: "0.5px solid var(--m4m-border)",
+          borderRadius: 8, padding: "10px 12px", marginBottom: 12,
+          fontSize: 13, lineHeight: 1.5, color: "var(--m4m-deep)",
+        }}>
+          <span style={{
+            flexShrink: 0, background: "var(--m4m-brand)", color: "#fff",
+            fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 999,
+          }}>v{recipe.version ?? 2}</span>
+          <span><strong style={{ fontWeight: 500 }}>Chef&apos;s changes:</strong> {recipe.changes}</span>
+        </div>
+      )}
 
       {/* Hero image */}
       <div style={{
@@ -52,6 +70,13 @@ export default function RecipeCard({ recipe, onSave, saved, userIngredients = []
             background: "var(--m4m-brand)", color: "#fff",
             fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 20,
           }}>{recipe.cookTime} min</span>
+          {recipe.difficulty && (
+            <span style={{
+              background: "rgba(255,255,255,0.92)", color: "var(--m4m-deep)",
+              fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 20,
+              backdropFilter: "blur(4px)",
+            }}>{recipe.difficulty}</span>
+          )}
         </div>
       </div>
 
@@ -66,7 +91,16 @@ export default function RecipeCard({ recipe, onSave, saved, userIngredients = []
           </p>
           <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "4px 0 0 0" }}>
             Serves {recipe.servings}
+            {recipe.caloriesPerServing ? ` · ~${recipe.caloriesPerServing} kcal per serving` : ""}
           </p>
+          {recipe.moodMatch && (
+            <p style={{
+              fontSize: 13, fontStyle: "italic", color: "var(--m4m-deep)", lineHeight: 1.6,
+              margin: "10px 0 0 0", paddingLeft: 10, borderLeft: "2px solid var(--m4m-brand)",
+            }}>
+              {recipe.moodMatch}
+            </p>
+          )}
         </div>
         {onSave && (
           <button
@@ -144,6 +178,15 @@ export default function RecipeCard({ recipe, onSave, saved, userIngredients = []
                   </li>
                 ))}
               </ol>
+
+              {recipe.chefTip && (
+                <div style={{
+                  marginTop: 12, background: "var(--card-bg)", border: "0.5px solid var(--m4m-light)",
+                  borderRadius: 8, padding: "10px 12px", fontSize: 13, lineHeight: 1.6, color: "var(--m4m-mid)",
+                }}>
+                  <strong style={{ fontWeight: 500, color: "var(--m4m-deep)" }}>👩‍🍳 Chef&apos;s tip:</strong> {recipe.chefTip}
+                </div>
+              )}
 
               {/* Grocery checklist */}
               <div style={{ fontSize: 11, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--m4m-mid)", margin: "16px 0 8px" }}>

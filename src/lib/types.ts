@@ -2,10 +2,17 @@ export interface Recipe {
   id?: string;
   title: string;
   description: string;
+  moodMatch?: string;
+  difficulty?: "Easy" | "Medium" | "Hard";
   cookTime: number;
   servings: number;
+  caloriesPerServing?: number;
   ingredients: string[];
   steps: string[];
+  usedFridgeItems?: string[];
+  chefTip?: string;
+  changes?: string;
+  version?: number;
   imageUrl: string;
   flag: string;
   country: string;
@@ -13,6 +20,23 @@ export interface Recipe {
   mood: number;
   diet: string[];
   createdAt?: string;
+  meta?: AiMeta;
+}
+
+export interface PromptPattern {
+  name: string;
+  how: string;
+}
+
+// What the "Under the hood" panel shows for each AI call.
+export interface AiMeta {
+  model: string;
+  effort: string;
+  latencyMs: number;
+  tokens: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  costUsd: number;
+  patterns: PromptPattern[];
+  prompt: { system: string; messages: { role: string; content: string }[] };
 }
 
 export interface CuisineEntry {

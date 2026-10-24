@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SavedCard from "@/components/SavedCard";
 import type { Recipe } from "@/lib/types";
+import { getSavedRecipes, deleteSavedRecipe } from "@/lib/savedRecipes";
 
 export default function SavedPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -10,24 +11,13 @@ export default function SavedPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/recipes")
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) throw new Error(data.error);
-        setRecipes(data.recipes ?? []);
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
+    setRecipes(getSavedRecipes());
+    setLoading(false);
   }, []);
 
-  async function handleDelete(id: string) {
+  function handleDelete(id: string) {
     try {
-      const res = await fetch("/api/recipes", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      if (!res.ok) throw new Error("Delete failed");
+      deleteSavedRecipe(id);
       setRecipes(prev => prev.filter(r => r.id !== id));
     } catch {
       setError("Failed to delete recipe");
@@ -42,7 +32,7 @@ export default function SavedPage() {
             Saved Recipes
           </h1>
           <p style={{ fontSize: 14, color: "var(--text-tertiary)", margin: "4px 0 0" }}>
-            Your personal collection
+            Your personal collection, saved in this browser
           </p>
         </div>
 

@@ -9,14 +9,28 @@ import FridgeSelector from "@/components/FridgeSelector";
 import RecipeSkeleton from "@/components/RecipeSkeleton";
 import RecipeCard from "@/components/RecipeCard";
 import CountryConfirmCard from "@/components/CountryConfirmCard";
-import type { CountryData } from "@/components/Globe";
-import type { Recipe } from "@/lib/types";
+import RemixBar from "@/components/RemixBar";
+import UnderTheHood from "@/components/UnderTheHood";
+import QuickPickTicker from "@/components/QuickPickTicker";
 import cuisineMap from "../../country-cuisine-map.json";
+import type { CountryData } from "@/components/Globe";
+import type { AiMeta, Recipe } from "@/lib/types";
+import type { RecipeRequestBody } from "@/lib/validate";
+import { saveRecipe } from "@/lib/savedRecipes";
+import { moodWord } from "@/lib/mood";
 
 const Globe = dynamic(() => import("@/components/Globe"), { ssr: false });
 
-type CuisineMapType = Record<string, { cuisine: string; flag: string; dishes: string[] }>;
-const MAP = cuisineMap as CuisineMapType;
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) throw new Error(data.error ?? "Something went wrong");
+  return data as T;
+}
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -51,6 +65,14 @@ export default function HomePage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [refining, setRefining] = useState(false);
+  const [lastRequest, setLastRequest] = useState<RecipeRequestBody | null>(null);
+  const [session, setSession] = useState({ calls: 0, costUsd: 0 });
+
+  const trackCost = (meta?: AiMeta) => {
+    if (meta) setSession(s => ({ calls: s.calls + 1, costUsd: s.costUsd + meta.costUsd }));
+  };
+
   const handleCountrySelect = useCallback((country: CountryData) => {
     setConfirming(country);
   }, []);
@@ -61,32 +83,23 @@ export default function HomePage() {
     setError(null);
     setSaved(false);
 
-    const countryEntry = Object.values(MAP).find(e => e.cuisine === country.cuisine);
-    const dishes = countryEntry?.dishes ?? country.dishes ?? [];
-    const flag = countryEntry?.flag ?? country.flag ?? "🌍";
+    const request: RecipeRequestBody = {
+      mood,
+      moodPreset,
+      country: country.name,
+      diet: Array.from(diet) as RecipeRequestBody["diet"],
+      cookTime,
+      ingredients,
+      lastTitle,
+      pinnedDish,
+    };
 
     try {
-      const res = await fetch("/api/generate-recipe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mood,
-          country: country.name,
-          cuisine: country.cuisine,
-          dishes,
-          diet: Array.from(diet),
-          cookTime,
-          ingredients,
-          lastTitle,
-          pinnedDish,
-          flag,
-        }),
-      });
-      if (!res.ok) throw new Error("Generation failed");
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setRecipe(data as Recipe);
+      const data = await postJson<Recipe>("/api/generate-recipe", request);
+      setRecipe(data);
       setLastTitle(data.title);
+      setLastRequest(request);
+      trackCost(data.meta);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -94,21 +107,53 @@ export default function HomePage() {
     }
   }
 
-  async function handleSave() {
+  // Iterative refinement: send the current recipe back with the user's tweak.
+  async function refineRecipe(instruction: string) {
+    if (!recipe || !lastRequest) return;
+    setRefining(true);
+    setError(null);
+    try {
+      const { meta: _meta, imageUrl, version, ...current } = recipe;
+      const data = await postJson<Recipe>("/api/refine-recipe", {
+        request: lastRequest,
+        recipe: current,
+        imageUrl,
+        version: version ?? 1,
+        instruction,
+      });
+      setRecipe(data);
+      setLastTitle(data.title);
+      setSaved(false);
+      trackCost(data.meta);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setRefining(false);
+    }
+  }
+
+  function handleSave() {
     if (!recipe) return;
     try {
-      const res = await fetch("/api/recipes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(recipe),
-      });
-      if (!res.ok) throw new Error("Save failed");
-      const { id } = await res.json();
+      const { meta: _meta, ...toSave } = recipe;
+      const id = saveRecipe(toSave);
       setRecipe(r => r ? { ...r, id } : r);
       setSaved(true);
     } catch {
       setError("Failed to save recipe");
     }
+  }
+
+  // Quick pick: one tap generates that exact dish.
+  function handleQuickPick(dish: string, cuisine: string) {
+    const entries = Object.entries(cuisineMap as Record<string, { cuisine: string; flag: string; dishes: string[] }>);
+    const match = entries.find(([, e]) => e.cuisine === cuisine && e.dishes.includes(dish));
+    if (!match) return;
+    const [name, e] = match;
+    const country: CountryData = { name, flag: e.flag, cuisine: e.cuisine, dishes: e.dishes, lat: 0, lon: 0 };
+    setConfirming(null);
+    setSelectedCountry(country);
+    generateRecipe(country, dish);
   }
 
   function handleConfirm(country: CountryData) {
@@ -117,7 +162,7 @@ export default function HomePage() {
     generateRecipe(country);
   }
 
-  const moodTxt = mood <= 10 ? "Cozy" : mood <= 20 ? "Soothing" : mood <= 30 ? "Mellow" : mood <= 40 ? "Steady" : mood <= 55 ? "Balanced" : mood <= 65 ? "Lively" : mood <= 75 ? "Bold" : mood <= 85 ? "Daring" : mood <= 95 ? "Wild" : "Unhinged";
+  const moodTxt = moodWord(mood);
 
   function getMoodWordStyle(txt: string): React.CSSProperties {
     switch (txt) {
@@ -145,6 +190,8 @@ export default function HomePage() {
           Set the mood, spin the globe, pick a country — we'll cook up a recipe to match.
         </p>
       </div>
+
+      <QuickPickTicker onPick={handleQuickPick} />
 
       {/* Mood slider — full width card (rendered by MoodSlider itself) */}
       <MoodSlider
@@ -307,7 +354,14 @@ export default function HomePage() {
         <div style={{ marginTop: 24 }}>
           {loading && <RecipeSkeleton />}
           {recipe && !loading && (
-            <RecipeCard recipe={recipe} onSave={handleSave} saved={saved} userIngredients={ingredients} />
+            <>
+              <RecipeCard
+                key={`${recipe.title}-${recipe.version ?? 1}`}
+                recipe={recipe} onSave={handleSave} saved={saved} userIngredients={ingredients}
+              />
+              <RemixBar onRefine={refineRecipe} busy={refining} />
+              {recipe.meta && <UnderTheHood meta={recipe.meta} session={session} />}
+            </>
           )}
         </div>
       )}
