@@ -4,6 +4,12 @@ An AI-powered recipe web app that recommends personalized recipes based on your 
 
 **▶ Live demo: [meal4mood-eta.vercel.app](https://meal4mood-eta.vercel.app)** — no sign-up needed.
 
+### 🎬 Demo video (81 s, with narration)
+
+[![Meal4Mood demo: pick a mood, open the fridge, generate a recipe, remix it, and look under the hood](docs/demo/demo-preview.png)](docs/demo/meal4mood-demo.mp4)
+
+[Watch the demo video](docs/demo/meal4mood-demo.mp4)
+
 ---
 
 ## The problem
