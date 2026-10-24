@@ -2,6 +2,8 @@
 
 An AI-powered recipe web app that recommends personalized recipes based on your mood, the cuisine you pick from a 3D globe, your dietary preferences, your cook time, and the ingredients in your fridge.
 
+**▶ Live demo: [meal4mood-eta.vercel.app](https://meal4mood-eta.vercel.app)** — no sign-up needed.
+
 ---
 
 ## The problem
