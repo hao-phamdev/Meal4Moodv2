@@ -6,9 +6,9 @@ An AI-powered recipe web app that recommends personalized recipes based on your 
 
 ### 🎬 Demo video (81 s, with narration)
 
-[![Meal4Mood demo: pick a mood, open the fridge, generate a recipe, remix it, and look under the hood](docs/demo/demo-preview.png)](docs/demo/meal4mood-demo.mp4)
+[![Meal4Mood demo: pick a mood, open the fridge, generate a recipe, remix it, and look under the hood](docs/demo/demo-preview.png)](https://drive.google.com/file/d/1C59ZbOpqz4rFw1TP25SJ-rixuRtecQb-/view?usp=sharing)
 
-[Watch the demo video](docs/demo/meal4mood-demo.mp4)
+**[▶ Watch on Google Drive](https://drive.google.com/file/d/1C59ZbOpqz4rFw1TP25SJ-rixuRtecQb-/view?usp=sharing)** (streams in the browser) · [or download the MP4](docs/demo/meal4mood-demo.mp4)
 
 ---
 
